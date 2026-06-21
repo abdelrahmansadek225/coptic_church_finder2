@@ -1,9 +1,9 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
+
+import '../providers/church_provider.dart';
+import '../providers/location_provider.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -13,95 +13,116 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  GoogleMapController? mapController;
-  LatLng _currentPosition = const LatLng(30.0444, 31.2357); // Cairo default
-  final Set<Marker> _markers = {};
+  static const LatLng _defaultPosition = LatLng(30.0444, 31.2357);
 
-  final String googleApiKey =
-      "AIzaSyDqlxno56gw2XDbYQuQG_t19ZzHERlqScI"; // API Key
+  GoogleMapController? mapController;
 
   @override
   void initState() {
     super.initState();
-    _getUserLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initializeMap());
   }
 
-  Future<void> _getUserLocation() async {
-    if (kIsWeb) {
-      // Web: استخدمي موقع افتراضي
-      _currentPosition = const LatLng(30.0444, 31.2357); // وسط القاهرة
-      print("Web detected: Using default location $_currentPosition");
-    } else {
-      // Mobile: جلب موقع حقيقي
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
+  Future<void> _initializeMap() async {
+    final churchProvider = context.read<ChurchProvider>();
+    final locationProvider = context.read<LocationProvider>();
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+    await churchProvider.loadChurches();
+    final locationAvailable = await locationProvider.getCurrentLocation();
+
+    if (!mounted) return;
+
+    final position = locationProvider.currentPosition;
+    if (locationAvailable && position != null) {
+      churchProvider.calculateNearestChurch(
+        position.latitude,
+        position.longitude,
       );
-      _currentPosition = LatLng(position.latitude, position.longitude);
-      print("Mobile GPS location: $_currentPosition");
+      await mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(position.latitude, position.longitude),
+          15,
+        ),
+      );
+    } else if (locationProvider.errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(locationProvider.errorMessage!)));
     }
-
-    // ماركر الموقع الحالي
-    _markers.add(
-      Marker(
-        markerId: const MarkerId("user"),
-        position: _currentPosition,
-        infoWindow: const InfoWindow(title: "You are here"),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
-      ),
-    );
-
-    // جلب الكنائس حوالين الموقع
-    await _getNearbyChurches();
-
-    print("Total markers: ${_markers.length}"); // عدد الكنائس + موقعك
-
-    setState(() {});
-
-    // تحريك الكاميرا
-    mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(_currentPosition, 15),
-    );
   }
 
-  Future<void> _getNearbyChurches() async {
-    final url =
-        "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${_currentPosition.latitude},${_currentPosition.longitude}&radius=5000&type=church&key=$googleApiKey";
+  Set<Marker> _buildMarkers(
+    ChurchProvider churchProvider,
+    LocationProvider locationProvider,
+  ) {
+    final markers = <Marker>{};
+    final nearestChurch = churchProvider.nearestChurch;
 
-    final response = await http.get(Uri.parse(url));
-    final data = json.decode(response.body);
-
-    if (data['status'] == 'OK') {
-      for (var place in data['results']) {
-        final loc = place['geometry']['location'];
-        _markers.add(
-          Marker(
-            markerId: MarkerId(place['place_id']),
-            position: LatLng(loc['lat'], loc['lng']),
-            infoWindow: InfoWindow(title: place['name']),
+    for (final church in churchProvider.churches) {
+      final isNearest = church.id == nearestChurch?.id;
+      markers.add(
+        Marker(
+          markerId: MarkerId(church.id),
+          position: LatLng(church.latitude, church.longitude),
+          infoWindow: InfoWindow(
+            title: church.name,
+            snippet: isNearest ? 'Nearest church' : church.address,
           ),
-        );
-      }
-    } else {
-      print("Places API Error: ${data['status']}");
+          icon: isNearest
+              ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen)
+              : BitmapDescriptor.defaultMarker,
+          zIndexInt: isNearest ? 2 : 1,
+        ),
+      );
     }
+
+    final position = locationProvider.currentPosition;
+    if (position != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('user'),
+          position: LatLng(position.latitude, position.longitude),
+          infoWindow: const InfoWindow(title: 'My Location'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
+          zIndexInt: 3,
+        ),
+      );
+    }
+
+    return markers;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: GoogleMap(
-        initialCameraPosition: CameraPosition(
-          target: _currentPosition,
-          zoom: 14,
-        ),
-        myLocationEnabled: true,
-        markers: _markers,
-        onMapCreated: (controller) => mapController = controller,
+      body: Consumer2<ChurchProvider, LocationProvider>(
+        builder: (context, churchProvider, locationProvider, child) {
+          final position = locationProvider.currentPosition;
+          final currentPosition = position == null
+              ? _defaultPosition
+              : LatLng(position.latitude, position.longitude);
+
+          return GoogleMap(
+            myLocationEnabled: position != null,
+            myLocationButtonEnabled: true,
+            zoomControlsEnabled: true,
+            markers: _buildMarkers(churchProvider, locationProvider),
+            initialCameraPosition: CameraPosition(
+              target: currentPosition,
+              zoom: 9,
+            ),
+            onMapCreated: (controller) {
+              mapController = controller;
+              if (position != null) {
+                controller.animateCamera(
+                  CameraUpdate.newLatLngZoom(currentPosition, 15),
+                );
+              }
+            },
+          );
+        },
       ),
     );
   }

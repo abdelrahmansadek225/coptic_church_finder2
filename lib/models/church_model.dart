@@ -16,4 +16,28 @@ class Church {
     required this.description,
     required this.imageUrl,
   });
+
+  factory Church.fromJson(Map<String, dynamic> json) {
+    return Church(
+      id: json['id'],
+      name: json['name'],
+      address: json['address'],
+      latitude: (json['latitude'] as num).toDouble(),
+      longitude: (json['longitude'] as num).toDouble(),
+      description: json['description'],
+      imageUrl: json['imageUrl'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'address': address,
+      'latitude': latitude,
+      'longitude': longitude,
+      'description': description,
+      'imageUrl': imageUrl,
+    };
+  }
 }

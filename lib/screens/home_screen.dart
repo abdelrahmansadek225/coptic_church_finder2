@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../models/church_model.dart';
+import '../providers/church_provider.dart';
 import 'map_screen.dart';
 import 'churches_list_screen.dart';
 import 'favorites_screen.dart';
@@ -79,7 +83,7 @@ class HomeContent extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Image.asset("assets/images/logo.png", width: 50),
+                      Image.asset("assets/images/Logo.png", width: 50),
                       const SizedBox(width: 10),
                       const Text(
                         "Coptic Church Finder",
@@ -163,16 +167,20 @@ class HomeContent extends StatelessWidget {
             /// FEATURED LIST
             SizedBox(
               height: 180,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
-                  _featuredCard(),
-                  const SizedBox(width: 15),
-                  _featuredCard(),
-                  const SizedBox(width: 15),
-                  _featuredCard(),
-                ],
+              child: Consumer<ChurchProvider>(
+                builder: (context, churchProvider, child) {
+                  final featuredChurches = churchProvider.churches.take(3);
+
+                  return ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: featuredChurches.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(width: 15),
+                    itemBuilder: (context, index) =>
+                        _featuredCard(featuredChurches.elementAt(index)),
+                  );
+                },
               ),
             ),
 
@@ -184,14 +192,14 @@ class HomeContent extends StatelessWidget {
   }
 
   /// FEATURED CARD
-  Widget _featuredCard() {
+  Widget _featuredCard(Church church) {
     return Container(
       width: 220,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(.08), blurRadius: 10),
+          BoxShadow(color: Colors.black.withValues(alpha: .08), blurRadius: 10),
         ],
       ),
       child: Column(
@@ -202,17 +210,19 @@ class HomeContent extends StatelessWidget {
                 top: Radius.circular(20),
               ),
               child: Image.asset(
-                "assets/images/logo.png",
+                church.imageUrl,
                 fit: BoxFit.cover,
                 width: double.infinity,
               ),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.all(10),
+          Padding(
+            padding: const EdgeInsets.all(10),
             child: Text(
-              "Saint Mark Church",
-              style: TextStyle(fontWeight: FontWeight.bold),
+              church.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -245,7 +255,10 @@ class _QuickButton extends StatelessWidget {
               color: Colors.white,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(.1), blurRadius: 10),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .1),
+                  blurRadius: 10,
+                ),
               ],
             ),
             child: Icon(icon, color: primaryGold, size: 30),

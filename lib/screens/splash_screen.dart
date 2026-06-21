@@ -60,12 +60,12 @@ class _SplashScreenState extends State<SplashScreen>
                 decoration: BoxDecoration(
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(.2),
+                      color: Colors.black.withValues(alpha: .2),
                       blurRadius: 20,
                     ),
                   ],
                 ),
-                child: Image.asset("assets/images/logo.png", width: 200),
+                child: Image.asset("assets/images/Logo.png", width: 200),
               ),
 
               const SizedBox(height: 40),

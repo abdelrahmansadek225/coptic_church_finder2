@@ -2,7 +2,7 @@
 <html>
 <head>
   <script
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDqlxno56gw2XDbYQuQG_t19ZzHERlqScI&libraries=places"></script>
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDqlxno56gw2XDbYQuQG_t19ZzHERlqScI"></script>
   <!--
     If you are serving your web app in a path other than the root, change the
     href value below to reflect the base path you are serving from.
@@ -17,7 +17,10 @@
     the `--base-href` argument provided to `flutter build`.
   -->
   <base href="$FLUTTER_BASE_HREF">
-
+<meta
+  http-equiv="Permissions-Policy"
+  content="geolocation=(self)"
+>
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
